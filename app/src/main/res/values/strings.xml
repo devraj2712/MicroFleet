@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">MicroFleet</string>
+    <string name="tagline">Intelligent Shared Last-Mile Logistics</string>
+    <string name="backend_status">Backend Connection</string>
+    <string name="btn_create_order">Create New Order</string>
+    <string name="btn_view_orders">View Orders</string>
+    <string name="btn_retry">Retry Connection</string>
+    <string name="btn_refresh">Refresh</string>
+    <string name="btn_submit_order">Submit Order</string>
+    <string name="title_create_order">Create Delivery Order</string>
+    <string name="title_order_list">Active Delivery Orders</string>
+    <string name="hint_delivery_lat">Delivery Latitude (e.g. 19.0680)</string>
+    <string name="hint_delivery_lon">Delivery Longitude (e.g. 72.8385)</string>
+    <string name="hint_weight">Weight in kg (e.g. 2.5)</string>
+    <string name="hint_pkg_count">Package count (e.g. 1)</string>
+    <string name="hint_handling">Handling instructions (optional)</string>
+</resources>
