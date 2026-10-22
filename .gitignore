@@ -1,0 +1,92 @@
+# MicroFleet Root .gitignore
+
+# Environment and Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.jks
+*.keystore
+*credentials*.json
+*serviceAccountKey*.json
+google-services.json
+
+# Local Databases & Persistent Storage
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Machine Learning & AI Model Artifacts
+backend/models/*.pkl
+backend/models/*.pt
+backend/models/*.pth
+backend/models/*.onnx
+backend/models/*.h5
+backend/models/*.zip
+!backend/models/.gitkeep
+
+# Heavy Data & Cached Networks
+backend/data/raw/*
+!backend/data/raw/.gitkeep
+backend/data/processed/*
+!backend/data/processed/.gitkeep
+backend/data/networks/*
+!backend/data/networks/.gitkeep
+*.graphml
+*.osm
+
+# Android Build & Gradle (Root Android Studio Project)
+.gradle/
+build/
+app/build/
+*.iml
+.idea/
+.cxx/
+local.properties
+Captures/
+*.apk
+*.aab
+output.json
+
+# OS and IDE specific
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+*.swp
+*~
