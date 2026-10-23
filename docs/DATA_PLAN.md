@@ -17,9 +17,10 @@ The following candidate data sources have been identified for algorithmic valida
 
 | Candidate Dataset | Origin / Reference | Primary Application | Status |
 | :--- | :--- | :--- | :--- |
-| **Li & Lim PDPTW Benchmark** | Li & Lim (2001), *Transportation Science* | Golden standard for Pickup-and-Delivery Problem with Time Windows (paired nodes, capacities) | **Candidate** *(Not downloaded)* |
+| **Li & Lim PDPTW Benchmark** | Li & Lim (2001), *Transportation Science* / SINTEF TOP | Gold standard for Pickup-and-Delivery Problem with Time Windows (paired nodes, capacities) | **Candidate / Local Test Fixture** *(Automated download blocked by SINTEF CMS HTTP 403; local test fixture used for format verification)* |
 | **Solomon VRPTW Benchmark** | Solomon (1987), *Operations Research* | Vehicle Routing Problem with Time Windows (clustered vs. randomized customer distributions) | **Candidate** *(Not downloaded)* |
-| **OpenStreetMap (OSM) Extracts** | OpenStreetMap Foundation (ODbL) via OSMnx | Real-world road network graph, street hierarchy, travel speeds, and node connectivity | **Candidate** *(To be fetched via script)* |
+
+| **OpenStreetMap (OSM) Extracts** | OpenStreetMap Foundation (ODbL) via OSMnx 2.1.1 | Real-world road network graph, street hierarchy, travel speeds, and node connectivity | **Acquired & Cached** *(Mumbai Delivery Corridor: 9,240 nodes, 20,457 edges)* |
 | **Instacart Market Basket Data** | Kaggle / Instacart Public Research Release | Distribution of parcel item counts, order clustering, and temporal order arrival patterns | **Candidate** *(Evaluation only)* |
 | **NYC Taxi & Limousine Ride Records** | NYC TLC Open Data | Real urban travel times and spatial pickup-dropoff density distributions | **Candidate** *(Optional reference)* |
 
@@ -29,16 +30,29 @@ The following candidate data sources have been identified for algorithmic valida
 
 ### 3.1 Network Ingestion Architecture
 Rather than relying on proprietary, rate-limited mapping APIs, MicroFleet utilizes OSMnx to download and process OpenStreetMap street networks:
-1. **Target Region Selection**: A bounded urban subregion (e.g., commercial district such as Shivajinagar/Kothrud, Pune, or a defined bounding box `[north, south, east, west]`).
-2. **Network Type**: Filtered for driveable roads (`network_type='drive'`) or bicycle/two-wheeler accessible infrastructure (`network_type='bike'`).
-3. **Graph Simplification**: Dead-ends retained for delivery access, but intermediate geometric nodes without intersections simplified to reduce memory footprint.
-4. **Edge Impedances**: Edge weights computed from actual road lengths (`meters`) and imputed speed limits (`speed_kph`), yielding edge travel times (`seconds`).
-5. **Persistence**: The extracted `MultiDiGraph` is serialized to `backend/data/networks/<region_name>.graphml`.
+1. **Target Region Selection**: The Mumbai demonstration corridor covering Lower Parel, Dadar, Prabhadevi, Bandra, Khar, Juhu, and Andheri with bounding box:
+   - West (Left): `72.8100`
+   - South (Bottom): `18.9750`
+   - East (Right): `72.8650`
+   - North (Top): `19.1350`
+2. **Network Type**: Filtered for drivable delivery roads (`network_type='drive'`).
+3. **Graph Simplification**: Geometric intersections simplified (`simplify=True`) while preserving access topology.
+4. **Edge Speeds & Travel Times**: Edge speeds imputed using street hierarchy (motorway: 50 km/h, primary: 35 km/h, secondary: 30 km/h, tertiary: 25 km/h, residential: 20 km/h) with a conservative urban fallback of `25.0 km/h`. Free-flow travel times computed per edge using `ox.add_edge_travel_times`.
+   - *Note*: These values represent topological free-flow estimates, NOT live traffic sensor data.
+5. **Persistence**: The extracted `MultiDiGraph` is serialized locally to:
+   - GraphML: `backend/data/networks/mumbai_drive_network.graphml` (ignored by Git)
+   - Metadata: `backend/data/networks/mumbai_drive_network.meta.json` (contains attribution, bbox, node/edge counts, retrieval timestamp).
+6. **Reproducible Command**:
+   ```bash
+   backend/.venv/Scripts/python backend/scripts/fetch_mumbai_network.py [--force]
+   ```
 
 ### 3.2 Geospatial Coordinate Snapping & Matrix Generation
-- **Coordinate Snapping**: For any arbitrary geographic point $(lat, lon)$ generated for a merchant or recipient, `ox.distance.nearest_nodes` snaps to the nearest navigable road node.
-- **Shortest Path Computation**: Pairwise travel time and distance matrices are computed using Dijkstra or A* algorithms over the cached graph.
-- **Matrix Caching**: For a batch of $N$ locations, the $N \times N$ matrix is stored in-memory during optimization to avoid redundant shortest-path recomputations.
+- **Coordinate Snapping**: `OSMService.snap_coordinate(latitude, longitude, max_dist_m=1000)` maps coordinates to the nearest road network node using OSMnx spatial indices. Points exceeding the maximum snap threshold or out-of-bounds coordinates are strictly rejected.
+- **Shortest Path Computation**: Pairwise travel time and distance estimates computed via directed Dijkstra over the graph. One-way restrictions and turn impedances are respected.
+- **Matrix Service**: `OSMService.compute_matrix(locations, weight)` computes $N \times N$ distance and duration matrices using single-source Dijkstra trees, preserving input ordering and detecting disconnected/unreachable nodes.
+- **Caching**: Snapped node coordinates and pairwise route estimates are cached in memory to eliminate redundant graph traversals.
+
 
 ---
 
@@ -103,3 +117,38 @@ To ensure scientific measurement and prevent regression during algorithm iterati
 - **Area**: $12\text{ km} \times 12\text{ km}$ metropolitan cluster.
 - **Purpose**: Evaluation of algorithmic scaling, memory usage, GA convergence stability, and RL inference latency under heavy load.
 - **Execution Target**: Total dispatch cycle $< 30\text{ s}$.
+
+---
+
+## 7. Public Pickup-and-Delivery Benchmark Pipeline (Li & Lim PDPTW)
+
+### 7.1 Provenance & License
+- **Origin**: Li & Lim (2001), *A Metaheuristic for the Pickup and Delivery Problem with Time Windows*, based on Solomon (1987) instances extended with paired precedence and demand symmetry.
+- **Repository**: Hosted by SINTEF Digital, Department of Mathematics and Cybernetics (`https://www.sintef.no/projectweb/top/pdptw/li-lim-benchmark/`).
+- **License**: Freely accessible for scientific, educational, and academic benchmarking.
+- **Retrieval Blocker & Resolution**: Automated programmatic HTTP downloads directly from SINTEF's CMS (`/contentassets/.../pdp_100.zip`) return `HTTP Error 403: Forbidden` due to server-side anti-scraping / Episerver CMS protection. In accordance with project protocol, this blocker is explicitly documented. To enable offline parser and data pipeline implementation without making unverified claims, a local test fixture was authored based on the documented format:
+  - Local Test Fixture: `backend/data/raw/pdp_100/LC101_sample.txt` *(format verification fixture; does NOT imply official archive download)*
+  - Ingestion & validation script: `backend/scripts/import_pdptw_benchmark.py`
+  - Normalized JSON artifact: `backend/data/processed/pdptw_lc101_sample.json`
+
+
+### 7.2 Ingestion & Integrity Validation
+The parser validates all structural and mathematical invariants:
+1. **Depot Invariant**: Customer 0 has demand 0, service time 0, and pickup/delivery indices of 0.
+2. **Precedence Pairing**: For every pickup node $p$, corresponding delivery node $d$ exists and explicitly points back to $p$ (`pickup_node == p`).
+3. **Demand Symmetry**: $\text{demand}(p) = -\text{demand}(d)$ and $\text{demand}(p) \le \text{vehicle\_capacity}$.
+4. **Time Windows**: $\text{ready\_time} \le \text{due\_date}$ for all nodes.
+
+### 7.3 Reproducible Command
+```bash
+backend/.venv/Scripts/python backend/scripts/import_pdptw_benchmark.py --probe
+```
+
+---
+
+## 8. Separation of Data Domains: Benchmark vs. Geographic Data
+
+To prevent methodological errors:
+- **Real Mumbai Data**: Evaluated strictly through `OSMService` using actual OpenStreetMap network topology, node coordinates $(lat, lon)$, directed one-way edges, and estimated travel times.
+- **Abstract Academic Benchmarks (Li & Lim)**: Evaluated using standard 2D Euclidean distance ($d = \sqrt{(x_1 - x_2)^2 + (y_1 - y_2)^2}$) and instance-native time units. Benchmark nodes are **never** snapped to arbitrary Mumbai roads or misrepresented as geographic coordinates.
+

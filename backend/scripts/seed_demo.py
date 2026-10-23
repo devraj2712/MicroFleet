@@ -6,7 +6,18 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from backend.app.core.database import SessionLocal, init_db
-from backend.app.models.entities import Merchant, Rider, Order, OrderStatus
+from backend.app.models.entities import (
+    Merchant,
+    Rider,
+    Order,
+    OrderStatus,
+    User,
+    UserRole,
+    Batch,
+    BatchOrder,
+    Route,
+    DispatchDraft,
+)
 
 
 def seed_demo_data():
@@ -17,6 +28,13 @@ def seed_demo_data():
 
     try:
         now = datetime.now(timezone.utc)
+
+        # Clear existing operational routes, batches, and drafts for clean demo state
+        db.query(BatchOrder).delete()
+        db.query(Route).delete()
+        db.query(Batch).delete()
+        db.query(DispatchDraft).delete()
+        db.commit()
 
         # 1. Seed Merchants (3 Mumbai clusters: Bandra, Dadar, Lower Parel)
         merchants_data = [
@@ -176,7 +194,72 @@ def seed_demo_data():
             else:
                 for k, v in o_data.items():
                     setattr(existing, k, v)
-                print(f"  * Updated Order: [{o_data['id']}]")
+        # 4. Seed Users (Role-based development accounts)
+        users_data = [
+            {
+                "id": "USR-DEV-MERCHANT",
+                "email": "merchant@microfleet.dev",
+                "role": UserRole.MERCHANT.value,
+                "merchant_id": "M-MUM-01",
+                "rider_id": None,
+                "is_active": True,
+            },
+            {
+                "id": "USR-DEV-RIDER",
+                "email": "rider@microfleet.dev",
+                "role": UserRole.RIDER.value,
+                "merchant_id": None,
+                "rider_id": "R-MUM-01",
+                "is_active": True,
+            },
+            {
+                "id": "USR-DEV-RIDER-2",
+                "email": "rider2@microfleet.dev",
+                "role": UserRole.RIDER.value,
+                "merchant_id": None,
+                "rider_id": "R-MUM-02",
+                "is_active": True,
+            },
+            {
+                "id": "USR-DEV-RIDER-3",
+                "email": "rider3@microfleet.dev",
+                "role": UserRole.RIDER.value,
+                "merchant_id": None,
+                "rider_id": "R-MUM-03",
+                "is_active": True,
+            },
+            {
+                "id": "USR-DEV-DISPATCHER",
+                "email": "dispatcher@microfleet.dev",
+                "role": UserRole.DISPATCHER.value,
+                "merchant_id": None,
+                "rider_id": None,
+                "is_active": True,
+            },
+            {
+                "id": "USR-DEV-ADMIN",
+                "email": "admin@microfleet.dev",
+                "role": UserRole.ADMIN.value,
+                "merchant_id": None,
+                "rider_id": None,
+                "is_active": True,
+            },
+        ]
+
+        print("Seeding Users...")
+        for u_data in users_data:
+            existing = db.get(User, u_data["id"])
+            if not existing:
+                existing_email = db.query(User).filter(User.email == u_data["email"]).first()
+                if existing_email:
+                    existing = existing_email
+            if not existing:
+                db.add(User(**u_data, created_at=now))
+                print(f"  + Created User: {u_data['email']} [{u_data['role']}]")
+            else:
+                for k, v in u_data.items():
+                    setattr(existing, k, v)
+                print(f"  * Updated User: {u_data['email']} [{u_data['role']}]")
 
         db.commit()
         print("\nDemo data seeding completed successfully! [All records marked as SIMULATED]")

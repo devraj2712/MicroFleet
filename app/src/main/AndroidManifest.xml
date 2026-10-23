@@ -16,7 +16,7 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".LoginActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -24,6 +24,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".CreateOrderActivity"
@@ -35,6 +40,14 @@
             android:name=".OrderListActivity"
             android:exported="true"
             android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".DispatcherActivity"
+            android:exported="true" />
+
+        <activity
+            android:name=".RiderActivity"
+            android:exported="true" />
 
     </application>
 

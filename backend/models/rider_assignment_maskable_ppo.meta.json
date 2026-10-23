@@ -1,0 +1,118 @@
+{
+  "model_name": "MaskablePPO-RiderAssignment",
+  "model_version": "1.0.0",
+  "algorithm": "MaskablePPO",
+  "created_at": "2026-10-22T18:52:52.492977+00:00",
+  "training_timesteps": 15000,
+  "training_time_seconds": 17.75,
+  "random_seed": 42,
+  "observation_space": {
+    "type": "Box",
+    "shape": [
+      57
+    ],
+    "low": -1.0,
+    "high": 1.0
+  },
+  "action_space": {
+    "type": "Discrete",
+    "n": 6,
+    "actions": {
+      "0": "Assign to candidate rider slot 0",
+      "1": "Assign to candidate rider slot 1",
+      "2": "Assign to candidate rider slot 2",
+      "3": "Assign to candidate rider slot 3",
+      "4": "Assign to candidate rider slot 4",
+      "5": "Defer / leave unassigned"
+    }
+  },
+  "dependencies": {
+    "torch": "2.14.1+cpu",
+    "gymnasium": "1.4.0",
+    "stable_baselines3": "2.9.0"
+  },
+  "held_out_evaluation": {
+    "test_seeds": [
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120
+    ],
+    "rl_agent": {
+      "policy_name": "MaskablePPO_Trained",
+      "scenarios_evaluated": 20,
+      "total_batches": 100,
+      "total_assigned": 94,
+      "total_unassigned": 6,
+      "percentage_batches_assigned": 94.0,
+      "percentage_on_time": 100.0,
+      "total_distance_km": 868.67,
+      "total_duration_min": 3503.2,
+      "hard_constraint_violations": 0,
+      "average_episode_reward": 52.34,
+      "reward_std_dev": 6.44,
+      "total_inference_time_ms": 68.96,
+      "avg_inference_time_per_decision_ms": 0.69
+    },
+    "baselines": {
+      "nearest_feasible_rider": {
+        "policy_name": "nearest_feasible_rider",
+        "scenarios_evaluated": 20,
+        "total_batches": 100,
+        "total_assigned": 93,
+        "total_unassigned": 7,
+        "percentage_batches_assigned": 93.0,
+        "percentage_on_time": 100.0,
+        "total_distance_km": 697.92,
+        "total_duration_min": 3031.4,
+        "hard_constraint_violations": 0,
+        "average_episode_reward": 51.14,
+        "reward_std_dev": 6.72
+      },
+      "least_loaded_feasible_rider": {
+        "policy_name": "least_loaded_feasible_rider",
+        "scenarios_evaluated": 20,
+        "total_batches": 100,
+        "total_assigned": 94,
+        "total_unassigned": 6,
+        "percentage_batches_assigned": 94.0,
+        "percentage_on_time": 100.0,
+        "total_distance_km": 957.12,
+        "total_duration_min": 3744.2,
+        "hard_constraint_violations": 0,
+        "average_episode_reward": 51.51,
+        "reward_std_dev": 6.43
+      },
+      "weighted_score_assignment": {
+        "policy_name": "weighted_score_assignment",
+        "scenarios_evaluated": 20,
+        "total_batches": 100,
+        "total_assigned": 93,
+        "total_unassigned": 7,
+        "percentage_batches_assigned": 93.0,
+        "percentage_on_time": 100.0,
+        "total_distance_km": 696.08,
+        "total_duration_min": 3026.4,
+        "hard_constraint_violations": 0,
+        "average_episode_reward": 51.46,
+        "reward_std_dev": 6.94
+      }
+    }
+  }
+}

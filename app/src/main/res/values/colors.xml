@@ -6,6 +6,7 @@
     <color name="primary_dark">#0F172A</color>
     <color name="accent">#0284C7</color>
     <color name="background_light">#F8FAFC</color>
+    <color name="background">#F8FAFC</color>
     <color name="card_background">#FFFFFF</color>
     <color name="text_primary">#0F172A</color>
     <color name="text_secondary">#64748B</color>

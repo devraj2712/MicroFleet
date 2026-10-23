@@ -90,5 +90,18 @@
             android:textSize="11sp"
             tools:text="Weight: 2.5 kg | Pkg: 2 | Priority: PREMIUM" />
 
+        <!-- Assignment Info -->
+        <TextView
+            android:id="@+id/text_order_assignment"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/primary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:text="Assigned: BATCH-MUM-01 | Rider: Vikram Sharma"
+            tools:visibility="visible" />
+
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

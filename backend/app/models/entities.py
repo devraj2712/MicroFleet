@@ -21,6 +21,7 @@ class OrderStatus(str, enum.Enum):
     PENDING = "PENDING"
     BATCHED = "BATCHED"
     DISPATCHED = "DISPATCHED"
+    PICKED_UP = "PICKED_UP"
     DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
 
@@ -40,11 +41,19 @@ class RouteStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
+class UserRole(str, enum.Enum):
+    MERCHANT = "MERCHANT"
+    RIDER = "RIDER"
+    DISPATCHER = "DISPATCHER"
+    ADMIN = "ADMIN"
+
+
 # Permitted Order Status Transitions
 PERMITTED_ORDER_TRANSITIONS: dict[OrderStatus, Set[OrderStatus]] = {
     OrderStatus.PENDING: {OrderStatus.BATCHED, OrderStatus.CANCELLED},
     OrderStatus.BATCHED: {OrderStatus.DISPATCHED, OrderStatus.PENDING, OrderStatus.CANCELLED},
-    OrderStatus.DISPATCHED: {OrderStatus.DELIVERED, OrderStatus.CANCELLED},
+    OrderStatus.DISPATCHED: {OrderStatus.PICKED_UP, OrderStatus.DELIVERED, OrderStatus.CANCELLED},
+    OrderStatus.PICKED_UP: {OrderStatus.DELIVERED, OrderStatus.CANCELLED},
     OrderStatus.DELIVERED: set(),  # Terminal
     OrderStatus.CANCELLED: set(),  # Terminal
 }
@@ -160,3 +169,31 @@ class Route(Base):
     # Relationships
     batch = relationship("Batch", back_populates="route")
     rider = relationship("Rider", back_populates="routes")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String(64), primary_key=True, index=True)  # UID (Firebase UID or dev uid)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    role = Column(String(32), nullable=False, default=UserRole.MERCHANT.value, index=True)
+    merchant_id = Column(String(64), ForeignKey("merchants.id", ondelete="SET NULL"), nullable=True, index=True)
+    rider_id = Column(String(64), ForeignKey("riders.id", ondelete="SET NULL"), nullable=True, index=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+    # Relationships
+    merchant = relationship("Merchant", foreign_keys=[merchant_id])
+    rider = relationship("Rider", foreign_keys=[rider_id])
+
+
+class DispatchDraft(Base):
+    __tablename__ = "dispatch_drafts"
+
+    id = Column(String(64), primary_key=True, index=True)  # e.g. DRAFT-ABC12345
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    is_committed = Column(Boolean, nullable=False, default=False, index=True)
+    committed_at = Column(DateTime(timezone=True), nullable=True)
+    policy_name = Column(String(64), nullable=False)
+    snapshot_json = Column(Text, nullable=False)  # JSON-encoded draft assignments, unassigned, summary

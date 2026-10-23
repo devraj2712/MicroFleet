@@ -161,6 +161,17 @@ public class CreateOrderActivity extends AppCompatActivity {
                 mMerchantsList
         );
         mSpinnerMerchants.setAdapter(adapter);
+
+        String loggedInMerchantId = ApiClient.getCurrentUser() != null ? ApiClient.getCurrentUser().getMerchantId() : null;
+        if (loggedInMerchantId != null) {
+            for (int i = 0; i < mMerchantsList.size(); i++) {
+                if (loggedInMerchantId.equals(mMerchantsList.get(i).getId())) {
+                    mSpinnerMerchants.setSelection(i);
+                    break;
+                }
+            }
+        }
+
         mSpinnerMerchants.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {

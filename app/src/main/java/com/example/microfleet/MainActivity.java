@@ -47,6 +47,23 @@ public class MainActivity extends AppCompatActivity {
         mBtnViewOrders = findViewById(R.id.btn_view_orders);
         mBtnConfigureUrl = findViewById(R.id.btn_configure_url);
 
+        TextView textMerchantProfile = findViewById(R.id.text_merchant_profile);
+        com.google.android.material.button.MaterialButton btnLogout = findViewById(R.id.btn_logout);
+
+        com.example.microfleet.model.UserDto currentUser = ApiClient.getCurrentUser();
+        if (currentUser != null) {
+            textMerchantProfile.setText(currentUser.getEmail() + " (" + currentUser.getMerchantId() + ")");
+        } else {
+            textMerchantProfile.setText("Merchant (Development Mode)");
+        }
+
+        btnLogout.setOnClickListener(v -> {
+            ApiClient.clearSession();
+            Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+            startActivity(intent);
+            finish();
+        });
+
         updateUrlDisplay();
 
         mBtnRetryConnection.setOnClickListener(v -> {

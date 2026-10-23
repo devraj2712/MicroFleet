@@ -143,10 +143,16 @@ class LogisticsService:
         return order
 
     @staticmethod
-    def get_orders(db: Session, status_filter: Optional[OrderStatus] = None) -> List[Order]:
+    def get_orders(
+        db: Session,
+        status_filter: Optional[OrderStatus] = None,
+        merchant_id: Optional[str] = None,
+    ) -> List[Order]:
         stmt = select(Order).order_by(Order.created_at.desc())
         if status_filter:
             stmt = stmt.where(Order.status == status_filter.value)
+        if merchant_id:
+            stmt = stmt.where(Order.merchant_id == merchant_id)
         return list(db.scalars(stmt).all())
 
     @staticmethod
@@ -154,13 +160,30 @@ class LogisticsService:
         return db.get(Order, order_id)
 
     @staticmethod
-    def update_order_status(db: Session, order_id: str, new_status: OrderStatus) -> Order:
+    def update_order_status(
+        db: Session,
+        order_id: str,
+        new_status: OrderStatus,
+        rider_id: Optional[str] = None,
+    ) -> Order:
         order = db.get(Order, order_id)
         if not order:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Order with ID '{order_id}' not found."
+                detail=f"Order with ID '{order_id}' not found.",
             )
+
+        # Rider authorization check
+        if rider_id:
+            assigned_rider_id = None
+            if order.batch_order and order.batch_order.batch and order.batch_order.batch.route:
+                assigned_rider_id = order.batch_order.batch.route.rider_id
+
+            if assigned_rider_id != rider_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Rider '{rider_id}' is not authorized to update order '{order_id}'. It is not assigned to this rider.",
+                )
 
         current_status = OrderStatus(order.status)
         if current_status == new_status:
@@ -169,10 +192,91 @@ class LogisticsService:
         if not is_valid_status_transition(current_status, new_status):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Illegal order status transition from '{current_status.value}' to '{new_status.value}'."
+                detail=f"Illegal order status transition from '{current_status.value}' to '{new_status.value}'.",
             )
 
         order.status = new_status.value
+
+        # If delivered, check if entire batch is completed
+        if new_status == OrderStatus.DELIVERED and order.batch_order and order.batch_order.batch:
+            batch = order.batch_order.batch
+            batch_order_ids = [bo.order_id for bo in batch.batch_orders]
+            other_orders = db.query(Order).filter(Order.id.in_(batch_order_ids)).all()
+            if all(o.status == OrderStatus.DELIVERED.value for o in other_orders):
+                batch.status = "COMPLETED"
+                if batch.route:
+                    batch.route.status = "COMPLETED"
+                    if batch.route.rider:
+                        batch.route.rider.is_available = True
+
         db.commit()
         db.refresh(order)
         return order
+
+    @staticmethod
+    def get_rider_assigned_routes(db: Session, rider_id: str) -> List[dict]:
+        """Fetch all active assigned routes for a given rider."""
+        import json
+        from backend.app.models.entities import Route, RouteStatus
+        from backend.app.schemas.schemas import OrderResponse
+
+        routes = (
+            db.query(Route)
+            .filter(
+                Route.rider_id == rider_id,
+                Route.status.in_([RouteStatus.ASSIGNED.value, RouteStatus.IN_PROGRESS.value]),
+            )
+            .order_by(Route.created_at.desc())
+            .all()
+        )
+
+        results = []
+        for r in routes:
+            try:
+                stops = json.loads(r.ordered_stops)
+            except Exception:
+                stops = []
+
+            orders_list = []
+            if r.batch and r.batch.batch_orders:
+                for bo in r.batch.batch_orders:
+                    ord_obj = db.get(Order, bo.order_id)
+                    if ord_obj:
+                        resp = OrderResponse.model_validate(ord_obj)
+                        resp.assigned_batch_id = r.batch_id
+                        resp.assigned_rider_id = r.rider_id
+                        resp.assigned_rider_name = r.rider.display_name if r.rider else "Unknown Rider"
+                        orders_list.append(resp)
+
+            results.append({
+                "route_id": r.id,
+                "batch_id": r.batch_id,
+                "rider_id": r.rider_id,
+                "rider_name": r.rider.display_name if r.rider else "Unknown Rider",
+                "status": r.status,
+                "estimated_distance_km": round(r.estimated_distance_m / 1000.0, 2),
+                "estimated_duration_minutes": round(r.estimated_duration_s / 60.0, 1),
+                "ordered_stops": stops,
+                "orders": orders_list,
+                "created_at": r.created_at,
+            })
+
+        return results
+
+    @staticmethod
+    def start_rider_route(db: Session, rider_id: str, route_id: str) -> dict:
+        """Transition route from ASSIGNED to IN_PROGRESS."""
+        from backend.app.models.entities import Route, RouteStatus
+
+        route = db.get(Route, route_id)
+        if not route:
+            raise HTTPException(status_code=404, detail=f"Route '{route_id}' not found.")
+        if route.rider_id != rider_id:
+            raise HTTPException(status_code=403, detail="Rider is not assigned to this route.")
+        if route.status != RouteStatus.ASSIGNED.value:
+            raise HTTPException(status_code=400, detail=f"Route status is '{route.status}', cannot start.")
+
+        route.status = RouteStatus.IN_PROGRESS.value
+        db.commit()
+        db.refresh(route)
+        return {"status": "success", "route_id": route.id, "route_status": route.status}

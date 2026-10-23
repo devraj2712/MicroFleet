@@ -50,6 +50,7 @@ wheels/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+cache/
 
 # Machine Learning & AI Model Artifacts
 backend/models/*.pkl

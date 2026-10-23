@@ -45,6 +45,8 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
             badgeColor = Color.parseColor("#2563EB"); // Blue
         } else if ("DISPATCHED".equalsIgnoreCase(order.getStatus())) {
             badgeColor = Color.parseColor("#7C3AED"); // Purple
+        } else if ("PICKED_UP".equalsIgnoreCase(order.getStatus())) {
+            badgeColor = Color.parseColor("#0891B2"); // Cyan
         } else if ("DELIVERED".equalsIgnoreCase(order.getStatus())) {
             badgeColor = Color.parseColor("#16A34A"); // Green
         } else if ("CANCELLED".equalsIgnoreCase(order.getStatus())) {
@@ -70,6 +72,15 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
                 order.getWeightKg(),
                 order.getPackageCount(),
                 order.getCustomerPriority()));
+
+        if (order.getAssignedBatchId() != null && !order.getAssignedBatchId().isEmpty()) {
+            holder.textOrderAssignment.setVisibility(View.VISIBLE);
+            String riderLabel = order.getAssignedRiderName() != null ? order.getAssignedRiderName() : order.getAssignedRiderId();
+            holder.textOrderAssignment.setText(String.format("Batch: %s | Rider: %s",
+                    order.getAssignedBatchId(), riderLabel != null ? riderLabel : "Unassigned"));
+        } else {
+            holder.textOrderAssignment.setVisibility(View.GONE);
+        }
     }
 
     @Override
@@ -84,6 +95,7 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
         TextView textOrderDestination;
         TextView textOrderDeadline;
         TextView textOrderSpecs;
+        TextView textOrderAssignment;
 
         public OrderViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -93,6 +105,7 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
             textOrderDestination = itemView.findViewById(R.id.text_order_destination);
             textOrderDeadline = itemView.findViewById(R.id.text_order_deadline);
             textOrderSpecs = itemView.findViewById(R.id.text_order_specs);
+            textOrderAssignment = itemView.findViewById(R.id.text_order_assignment);
         }
     }
 }

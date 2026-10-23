@@ -48,6 +48,15 @@ public class OrderDto {
     @SerializedName("created_at")
     private String createdAt;
 
+    @SerializedName("assigned_batch_id")
+    private String assignedBatchId;
+
+    @SerializedName("assigned_rider_id")
+    private String assignedRiderId;
+
+    @SerializedName("assigned_rider_name")
+    private String assignedRiderName;
+
     public String getId() { return id; }
     public String getMerchantId() { return merchantId; }
     public double getPickupLatitude() { return pickupLatitude; }
@@ -63,4 +72,7 @@ public class OrderDto {
     public int getMerchantPriority() { return merchantPriority; }
     public String getStatus() { return status; }
     public String getCreatedAt() { return createdAt; }
+    public String getAssignedBatchId() { return assignedBatchId; }
+    public String getAssignedRiderId() { return assignedRiderId; }
+    public String getAssignedRiderName() { return assignedRiderName; }
 }
