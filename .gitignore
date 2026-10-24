@@ -64,6 +64,8 @@ backend/models/*.zip
 # Heavy Data & Cached Networks
 backend/data/raw/*
 !backend/data/raw/.gitkeep
+!backend/data/raw/pdp_100/
+!backend/data/raw/pdp_100/LC101_sample.txt
 backend/data/processed/*
 !backend/data/processed/.gitkeep
 backend/data/networks/*

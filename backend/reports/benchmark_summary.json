@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-10-24T08:10:27.059182+00:00",
+  "random_seed": 42,
+  "scenarios": {
+    "N_10": {
+      "num_orders": 10,
+      "num_riders": 3,
+      "batches_formed": 3,
+      "batches_assigned": 3,
+      "percentage_assigned": 100.0,
+      "all_deadlines_met": true,
+      "runtime_ms": 1783.72,
+      "metrics": {
+        "solo_distance_km": 73.74,
+        "solo_duration_min": 237.0,
+        "greedy_distance_km": 41.33,
+        "greedy_duration_min": 159.2,
+        "microfleet_distance_km": 38.36,
+        "microfleet_duration_min": 152.1,
+        "distance_reduction_vs_solo_pct": 48.0,
+        "distance_reduction_vs_greedy_pct": 7.2
+      }
+    },
+    "N_20": {
+      "num_orders": 20,
+      "num_riders": 4,
+      "batches_formed": 6,
+      "batches_assigned": 6,
+      "percentage_assigned": 100.0,
+      "all_deadlines_met": true,
+      "runtime_ms": 1801.72,
+      "metrics": {
+        "solo_distance_km": 146.87,
+        "solo_duration_min": 472.5,
+        "greedy_distance_km": 117.66,
+        "greedy_duration_min": 402.4,
+        "microfleet_distance_km": 82.81,
+        "microfleet_duration_min": 318.8,
+        "distance_reduction_vs_solo_pct": 43.6,
+        "distance_reduction_vs_greedy_pct": 29.6
+      }
+    },
+    "N_30": {
+      "num_orders": 30,
+      "num_riders": 6,
+      "batches_formed": 13,
+      "batches_assigned": 9,
+      "percentage_assigned": 69.2,
+      "all_deadlines_met": true,
+      "runtime_ms": 3057.54,
+      "metrics": {
+        "solo_distance_km": 209.54,
+        "solo_duration_min": 682.9,
+        "greedy_distance_km": 146.51,
+        "greedy_duration_min": 531.6,
+        "microfleet_distance_km": 99.81,
+        "microfleet_duration_min": 359.5,
+        "distance_reduction_vs_solo_pct": 52.4,
+        "distance_reduction_vs_greedy_pct": 31.9
+      }
+    }
+  }
+}

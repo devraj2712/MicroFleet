@@ -204,8 +204,20 @@ class RLDispatchService:
         rl_metadata = {}
         model = None
         if policy_choice == "rl":
-            model, rl_metadata = load_trained_model(model_path)
-            policy_label = "MaskablePPO (Trained Policy)"
+            try:
+                model, rl_metadata = load_trained_model(model_path)
+                policy_label = "MaskablePPO (Trained Policy)"
+            except FileNotFoundError as e:
+                logger.warning(
+                    "Trained RL model checkpoint not found (%s). Gracefully falling back to Weighted-Score baseline policy.",
+                    e,
+                )
+                policy_choice = "weighted"
+                policy_label = "Weighted-Score Assignment (RL Untrained Fallback)"
+                rl_metadata = {
+                    "fallback_note": "Trained RL model checkpoint (.zip) not found; run train_rider_assignment.py to train. Evaluated using Weighted-Score baseline.",
+                    "trained_checkpoint_missing": True,
+                }
         elif policy_choice == "nearest":
             policy_label = "Nearest Feasible Rider Baseline"
         elif policy_choice == "least_loaded":
