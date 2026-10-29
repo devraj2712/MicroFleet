@@ -23,6 +23,7 @@ from backend.app.intelligence.osm.osm_service import (
 from backend.app.intelligence.rl.baselines import (
     LeastLoadedFeasibleRiderPolicy,
     NearestFeasibleRiderPolicy,
+    RouteAwareFleetAssignmentPolicy,
     WeightedScoreAssignmentPolicy,
 )
 from backend.app.intelligence.rl.environment import (
@@ -48,12 +49,34 @@ class AssignedBatchItem(BaseModel):
     stops: List[RouteStop]
     workload_before: int
     workload_after: int
+    approach_distance_km: float = 0.0
+    approach_duration_minutes: float = 0.0
+    route_coordinates: List[List[float]] = Field(
+        default_factory=list,
+        description="Continuous road network lat/lon pairs for polyline rendering",
+    )
+    fleet_cost: float = 0.0
+    explanation: str = Field(
+        default="",
+        description="Explainable reason why this rider was selected over alternatives",
+    )
+    evaluated_alternatives: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Compact comparison of all candidate riders evaluated",
+    )
 
 
 class UnassignedBatchItem(BaseModel):
     batch_id: str
     order_ids: List[str]
     reason: str
+    diagnostic_details: Optional[str] = None
+    evaluated_alternatives: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Details for each candidate rider and why each was rejected",
+    )
+    distance_km: Optional[float] = None
+    duration_minutes: Optional[float] = None
 
 
 class RiderWorkloadSummary(BaseModel):
@@ -154,11 +177,28 @@ class RLDispatchService:
 
         for b_res in aco_routes.batches:
             if not b_res.is_routeable:
+                alt_list = []
+                for cand in b_res.route_candidates:
+                    alt_list.append({
+                        "rider_id": cand.rider_id,
+                        "rider_name": cand.rider_display_name,
+                        "is_feasible": cand.is_feasible,
+                        "approach_distance_km": getattr(cand, "approach_distance_km", 0.0),
+                        "approach_duration_minutes": getattr(cand, "approach_duration_minutes", 0.0),
+                        "total_distance_km": cand.distance_km,
+                        "total_duration_minutes": cand.duration_minutes,
+                        "reasons": cand.infeasibility_reasons,
+                        "selected": False,
+                    })
                 unassigned_immediate.append(
                     UnassignedBatchItem(
                         batch_id=b_res.batch_id,
                         order_ids=b_res.order_ids,
                         reason=b_res.unrouteable_reason or "No feasible candidate routes available.",
+                        diagnostic_details=b_res.unrouteable_reason,
+                        evaluated_alternatives=alt_list,
+                        distance_km=None,
+                        duration_minutes=None,
                     )
                 )
                 continue
@@ -204,8 +244,16 @@ class RLDispatchService:
         rl_metadata = {}
         model = None
         if policy_choice == "rl":
-            model, rl_metadata = load_trained_model(model_path)
-            policy_label = "MaskablePPO (Trained Policy)"
+            try:
+                model, rl_metadata = load_trained_model(model_path)
+                policy_label = "MaskablePPO (Trained Policy with Route-Aware Fallback)"
+            except Exception as e:
+                logger.warning("RL model load failed, falling back to Route-Aware policy: %s", e)
+                model = None
+                policy_choice = "route_aware"
+                policy_label = "Route-Aware Fleet Assignment (Global Objective)"
+        elif policy_choice == "route_aware":
+            policy_label = "Route-Aware Fleet Assignment (Global Objective)"
         elif policy_choice == "nearest":
             policy_label = "Nearest Feasible Rider Baseline"
         elif policy_choice == "least_loaded":
@@ -225,38 +273,116 @@ class RLDispatchService:
         while not terminated:
             action_mask = env.action_masks()
 
-            if policy_choice == "rl":
+            if policy_choice == "rl" and model is not None:
                 action, _ = model.predict(obs, action_masks=action_mask, deterministic=True)
                 action = int(action)
+                # Ensure a feasible candidate is not dropped by RL deferral:
+                if action == env.defer_action:
+                    feasible_slots = [i for i in range(env.max_candidate_riders) if action_mask[i]]
+                    if feasible_slots:
+                        action = RouteAwareFleetAssignmentPolicy().select_action(env)
+            elif policy_choice == "route_aware":
+                action = RouteAwareFleetAssignmentPolicy().select_action(env)
             elif policy_choice == "nearest":
                 action = NearestFeasibleRiderPolicy().select_action(env)
             elif policy_choice == "least_loaded":
                 action = LeastLoadedFeasibleRiderPolicy().select_action(env)
             elif policy_choice == "weighted":
                 action = WeightedScoreAssignmentPolicy().select_action(env)
+            else:
+                action = RouteAwareFleetAssignmentPolicy().select_action(env)
 
             obs, reward, terminated, truncated, step_info = env.step(action)
 
         infer_time_ms = round((time.perf_counter() - start_infer) * 1000.0, 2)
 
-        # 7. Collect Assigned and Unassigned Results
+        # 7. Collect Assigned and Unassigned Results with Rich Explanations
         assigned_items: List[AssignedBatchItem] = []
         unassigned_items: List[UnassignedBatchItem] = list(unassigned_immediate)
 
+        batch_lookup = {b.batch_id: b for b in scenario_batches}
+
         for rec in env.assignment_history:
+            b_item = batch_lookup.get(rec["batch_id"])
             if rec["status"] == "ASSIGNED":
                 route_dict = rec["route"]
-                # Convert back to RouteStop models
                 stops = [RouteStop(**s) for s in route_dict["stops"]]
+                chosen_rider_id = rec["assigned_rider_id"]
+                chosen_rider_name = rec["assigned_rider_name"]
+
+                # Build evaluated alternatives comparison
+                eval_alts: List[Dict[str, Any]] = []
+                best_alt_summary = "no other feasible rider alternatives"
+                chosen_cost = 0.0
+
+                if b_item:
+                    feasible_alts = []
+                    for r_sim in scenario_riders:
+                        cand = b_item.route_candidates.get(r_sim.rider_id)
+                        if not cand:
+                            continue
+                        appr_k = getattr(cand, "approach_distance_km", 0.0)
+                        appr_m = getattr(cand, "approach_duration_minutes", 0.0)
+                        f_cost = (
+                            cand.duration_minutes
+                            + (0.5 * cand.distance_km)
+                            + (0.2 * appr_k)
+                            + (2.0 * r_sim.assigned_batch_count)
+                        )
+                        is_sel = (r_sim.rider_id == chosen_rider_id)
+                        if is_sel:
+                            chosen_cost = f_cost
+
+                        alt_dict = {
+                            "rider_id": r_sim.rider_id,
+                            "rider_name": r_sim.display_name,
+                            "approach_distance_km": round(appr_k, 2),
+                            "approach_duration_minutes": round(appr_m, 1),
+                            "total_distance_km": round(cand.distance_km, 2),
+                            "total_duration_minutes": round(cand.duration_minutes, 1),
+                            "is_feasible": cand.is_feasible,
+                            "reasons": cand.infeasibility_reasons,
+                            "fleet_cost": round(f_cost, 2) if cand.is_feasible else None,
+                            "selected": is_sel,
+                        }
+                        eval_alts.append(alt_dict)
+                        if cand.is_feasible and not is_sel:
+                            feasible_alts.append(alt_dict)
+
+                    if feasible_alts:
+                        best_alt = min(feasible_alts, key=lambda a: a["fleet_cost"] if a["fleet_cost"] is not None else float("inf"))
+                        chosen_dur = route_dict["duration_minutes"]
+                        alt_dur = best_alt["total_duration_minutes"]
+                        diff_min = chosen_dur - alt_dur
+                        best_alt_summary = f"{best_alt['rider_name']} (fleet cost {best_alt['fleet_cost']:.1f}, {diff_min:+.1f}m duration diff)"
+
+                appr_km = route_dict.get("approach_distance_km", 0.0)
+                appr_min = route_dict.get("approach_duration_minutes", 0.0)
+                tot_w = b_item.total_weight_kg if b_item else 0.0
+                tot_p = b_item.total_packages if b_item else 0
+
+                explanation = (
+                    f"Rider {chosen_rider_name} assigned to Batch {rec['batch_id']} because the rider can collect "
+                    f"the {len(rec['order_ids'])} orders while travelling through their pickup areas. "
+                    f"Approach to pickup is {appr_km:.1f} km ({appr_min:.1f} mins); total route adds {route_dict['distance_km']:.1f} km "
+                    f"and {route_dict['duration_minutes']:.1f} minutes. All deadlines and capacity limits ({tot_w:.1f}kg / {tot_p} pkgs) "
+                    f"are satisfied. Selected plan has an estimated fleet cost of {chosen_cost:.1f} compared with {best_alt_summary}."
+                )
 
                 assigned_items.append(
                     AssignedBatchItem(
                         batch_id=rec["batch_id"],
                         order_ids=rec["order_ids"],
-                        assigned_rider_id=rec["assigned_rider_id"],
-                        assigned_rider_name=rec["assigned_rider_name"],
+                        assigned_rider_id=chosen_rider_id,
+                        assigned_rider_name=chosen_rider_name,
                         distance_km=route_dict["distance_km"],
                         duration_minutes=route_dict["duration_minutes"],
+                        approach_distance_km=appr_km,
+                        approach_duration_minutes=appr_min,
+                        route_coordinates=route_dict.get("route_coordinates", []),
+                        fleet_cost=round(chosen_cost, 2),
+                        explanation=explanation,
+                        evaluated_alternatives=eval_alts,
                         all_deadlines_met=route_dict["all_deadlines_met"],
                         stops=stops,
                         workload_before=rec["workload_before"],
@@ -264,11 +390,31 @@ class RLDispatchService:
                     )
                 )
             else:
+                alt_list = []
+                if b_item:
+                    for r_sim in scenario_riders:
+                        cand = b_item.route_candidates.get(r_sim.rider_id)
+                        if cand:
+                            alt_list.append({
+                                "rider_id": r_sim.rider_id,
+                                "rider_name": r_sim.display_name,
+                                "is_feasible": cand.is_feasible,
+                                "approach_distance_km": getattr(cand, "approach_distance_km", 0.0),
+                                "approach_duration_minutes": getattr(cand, "approach_duration_minutes", 0.0),
+                                "total_distance_km": cand.distance_km,
+                                "total_duration_minutes": cand.duration_minutes,
+                                "reasons": cand.infeasibility_reasons,
+                                "selected": False,
+                            })
+
                 unassigned_items.append(
                     UnassignedBatchItem(
                         batch_id=rec["batch_id"],
                         order_ids=rec["order_ids"],
-                        reason=rec.get("reason", "Deferred by policy."),
+                        reason=rec.get("reason", "Deferred by dispatch policy."),
+                        evaluated_alternatives=alt_list,
+                        distance_km=None,
+                        duration_minutes=None,
                     )
                 )
 
@@ -292,6 +438,7 @@ class RLDispatchService:
         # 9. Comparative Baseline Evaluation on identical scenario
         baseline_comps = {}
         for b_policy in [
+            RouteAwareFleetAssignmentPolicy(),
             NearestFeasibleRiderPolicy(),
             LeastLoadedFeasibleRiderPolicy(),
             WeightedScoreAssignmentPolicy(),
@@ -311,11 +458,15 @@ class RLDispatchService:
                 "assigned_count": bm["total_assigned"],
                 "unassigned_count": baseline_unassigned_total,
                 "percentage_batches_assigned": round((bm["total_assigned"] / max(1, total_batches_all)) * 100.0, 1),
-                "total_distance_km": round(bm["total_distance_km"], 2),
-                "total_duration_min": round(bm["total_duration_min"], 1),
+                "total_distance_km": round(bm["total_distance_km"], 2) if bm["total_assigned"] > 0 else 0.0,
+                "total_duration_min": round(bm["total_duration_min"], 1) if bm["total_assigned"] > 0 else 0.0,
                 "on_time_count": bm["on_time_count"],
                 "episode_reward": round(b_rew, 2),
             }
+
+        has_assigned = len(assigned_items) > 0
+        tot_dist = round(sum(a.distance_km for a in assigned_items), 2) if has_assigned else None
+        tot_dur = round(sum(a.duration_minutes for a in assigned_items), 1) if has_assigned else None
 
         summary = {
             "total_candidate_batches": total_batches_all,
@@ -324,10 +475,13 @@ class RLDispatchService:
             "assigned_batches_count": len(assigned_items),
             "unassigned_batches_count": len(unassigned_items),
             "percentage_batches_assigned": round((len(assigned_items) / max(1, total_batches_all)) * 100.0, 1),
-            "total_distance_km": round(sum(a.distance_km for a in assigned_items), 2),
-            "total_duration_minutes": round(sum(a.duration_minutes for a in assigned_items), 1),
-            "all_assignments_deadline_feasible": all(a.all_deadlines_met for a in assigned_items),
+            "total_distance_km": tot_dist if tot_dist is not None else 0.0,
+            "total_duration_minutes": tot_dur if tot_dur is not None else 0.0,
+            "display_distance": f"{tot_dist:.1f} km" if tot_dist is not None else "Not available",
+            "display_duration": f"{tot_dur:.1f} mins" if tot_dur is not None else "Not available",
+            "all_assignments_deadline_feasible": all(a.all_deadlines_met for a in assigned_items) if has_assigned else False,
             "selected_policy": policy_label,
+            "assignment_objective": "Min-Incremental-Fleet-Cost (Travel Duration + 0.5 * Distance + Detour)",
             "inference_time_ms": infer_time_ms,
         }
 

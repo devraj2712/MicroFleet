@@ -291,9 +291,9 @@ class DispatchOptimizationPreviewRequest(BaseModel):
         None, description="Optional reference timestamp for deterministic evaluation."
     )
     policy_choice: str = Field(
-        default="rl",
-        pattern="^(rl|nearest|least_loaded|weighted)$",
-        description="Dispatch assignment policy: 'rl' (trained MaskablePPO), 'nearest', 'least_loaded', or 'weighted'",
+        default="route_aware",
+        pattern="^(rl|route_aware|nearest|least_loaded|weighted)$",
+        description="Dispatch assignment policy: 'route_aware' (Global Fleet Cost), 'rl' (trained MaskablePPO), 'nearest', 'least_loaded', or 'weighted'",
     )
     ga_config: Optional[GAConfigInput] = None
     aco_config: Optional[ACOConfigInput] = None

@@ -74,12 +74,137 @@
             android:textSize="13sp"
             android:visibility="gone" />
 
-        <!-- Destination Section -->
+        <!-- Map Location Picker Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Delivery Destination"
+            android:text="Choose Locations on Map"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_map_instruction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Select mode below, then tap on the Mumbai map to place marker"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_mode_pickup"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:text="Set Pickup Point"
+                android:textColor="@color/primary"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btn_mode_delivery"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:backgroundTint="@color/accent"
+                android:text="Set Destination"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Preset Landmark Quick Selection Chips -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/chip_bandra"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="📍 Bandra"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/chip_dadar"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="📍 Dadar"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/chip_lower_parel"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="📍 Lower Parel"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/chip_juhu"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="📍 Juhu"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/chip_borivali"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="📍 Borivali"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/chip_worli"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="📍 Worli"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_marginTop="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="3dp"
+            app:strokeColor="#CBD5E1"
+            app:strokeWidth="1dp">
+
+            <org.osmdroid.views.MapView
+                android:id="@+id/map_create_order"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Destination Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Selected Coordinates"
             android:textColor="@color/text_primary"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -101,7 +226,7 @@
                     android:id="@+id/edit_delivery_lat"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Latitude"
+                    android:hint="Delivery Lat"
                     android:inputType="numberDecimal|numberSigned"
                     android:text="19.0680" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -117,7 +242,7 @@
                     android:id="@+id/edit_delivery_lon"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Longitude"
+                    android:hint="Delivery Lon"
                     android:inputType="numberDecimal|numberSigned"
                     android:text="72.8385" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -128,7 +253,7 @@
             style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Use Sample Mumbai Destination"
+            android:text="Reset to Standard Mumbai Delivery"
             android:textColor="@color/accent"
             android:textSize="12sp" />
 

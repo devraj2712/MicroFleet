@@ -29,6 +29,8 @@ public class MainActivity extends AppCompatActivity {
     private Button mBtnRetryConnection;
     private Button mBtnCreateOrder;
     private Button mBtnViewOrders;
+    private Button mBtnDeliveryMap;
+    private Button mBtnFleetSimulation;
     private Button mBtnConfigureUrl;
 
     private boolean mHasAttemptedFallback = false;
@@ -45,6 +47,8 @@ public class MainActivity extends AppCompatActivity {
         mBtnRetryConnection = findViewById(R.id.btn_retry_connection);
         mBtnCreateOrder = findViewById(R.id.btn_create_order);
         mBtnViewOrders = findViewById(R.id.btn_view_orders);
+        mBtnDeliveryMap = findViewById(R.id.btn_delivery_map);
+        mBtnFleetSimulation = findViewById(R.id.btn_fleet_simulation);
         mBtnConfigureUrl = findViewById(R.id.btn_configure_url);
 
         TextView textMerchantProfile = findViewById(R.id.text_merchant_profile);
@@ -78,6 +82,18 @@ public class MainActivity extends AppCompatActivity {
             Intent intent = new Intent(MainActivity.this, OrderListActivity.class);
             startActivity(intent);
         });
+        if (mBtnDeliveryMap != null) {
+            mBtnDeliveryMap.setOnClickListener(v -> {
+                Intent intent = new Intent(MainActivity.this, OrderListActivity.class);
+                startActivity(intent);
+            });
+        }
+        if (mBtnFleetSimulation != null) {
+            mBtnFleetSimulation.setOnClickListener(v -> {
+                Intent intent = new Intent(MainActivity.this, DispatcherActivity.class);
+                startActivity(intent);
+            });
+        }
         mBtnConfigureUrl.setOnClickListener(v -> showConfigureUrlDialog());
 
         checkBackendHealth();

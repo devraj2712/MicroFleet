@@ -259,3 +259,17 @@ def start_rider_route(
                     detail="Access denied: You cannot start routes assigned to other riders.",
                 )
     return LogisticsService.start_rider_route(db, rider_id, route_id)
+
+
+# --- Demo Reset & Seeding Endpoint ---
+
+@api_router.post(
+    "/demo/reset",
+    status_code=status.HTTP_200_OK,
+    tags=["Demo"],
+    summary="Reset Demo Data",
+    description="Explicitly resets operational demo records with fresh relative delivery deadlines, available riders, and multi-merchant orders.",
+)
+def reset_demo_endpoint(db: Session = Depends(get_db)):
+    from backend.scripts.seed_demo import seed_demo_data
+    return seed_demo_data(session=db)

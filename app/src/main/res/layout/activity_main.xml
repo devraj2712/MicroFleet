@@ -150,26 +150,52 @@
         <Button
             android:id="@+id/btn_create_order"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="52dp"
             android:layout_marginTop="16dp"
             android:backgroundTint="@color/primary"
             android:text="@string/btn_create_order"
             android:textAllCaps="false"
-            android:textSize="16sp"
+            android:textSize="15sp"
             app:cornerRadius="10dp" />
 
         <Button
             android:id="@+id/btn_view_orders"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            android:text="@string/btn_view_orders"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:text="📦 My Orders"
             android:textAllCaps="false"
             android:textColor="@color/primary"
-            android:textSize="16sp"
+            android:textSize="15sp"
             app:cornerRadius="10dp"
             app:strokeColor="@color/primary" />
+
+        <Button
+            android:id="@+id/btn_delivery_map"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:text="🗺️ Delivery Map (Active Orders)"
+            android:textAllCaps="false"
+            android:textColor="#0284C7"
+            android:textSize="15sp"
+            app:cornerRadius="10dp"
+            app:strokeColor="#0284C7" />
+
+        <Button
+            android:id="@+id/btn_fleet_simulation"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:text="⚡ Shared Fleet Simulation [Demo Mode]"
+            android:textAllCaps="false"
+            android:textColor="#D97706"
+            android:textSize="14sp"
+            app:cornerRadius="10dp"
+            app:strokeColor="#D97706" />
 
         <Button
             android:id="@+id/btn_configure_url"

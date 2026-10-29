@@ -112,6 +112,48 @@ class WeightedScoreAssignmentPolicy(BaselinePolicy):
         return best_slot if best_slot >= 0 else defer_action
 
 
+class RouteAwareFleetAssignmentPolicy(BaselinePolicy):
+    """Minimizes total fleet incremental cost combining approach time, route duration/distance, and workload."""
+    name = "route_aware_fleet_assignment"
+
+    def select_action(self, env: RiderAssignmentEnv) -> int:
+        mask = env.action_masks()
+        defer_action = env.defer_action
+
+        feasible_slots = [i for i in range(env.max_candidate_riders) if mask[i]]
+        if not feasible_slots:
+            return defer_action
+
+        batch = env.batches[env.current_batch_idx]
+        best_slot = -1
+        best_cost = float("inf")
+
+        for slot in feasible_slots:
+            rider = env.riders[slot]
+            route = batch.route_candidates.get(rider.rider_id)
+            if not route:
+                continue
+
+            appr_km = getattr(route, "approach_distance_km", 0.0)
+            appr_min = getattr(route, "approach_duration_minutes", 0.0)
+
+            # Documented fleet objective cost:
+            # 1.0 * duration_minutes + 0.5 * distance_km + 0.2 * approach_distance_km + 2.0 * assigned_count
+            cost = (
+                route.duration_minutes
+                + (0.5 * route.distance_km)
+                + (0.2 * appr_km)
+                + (2.0 * rider.assigned_batch_count)
+            )
+
+            # Deterministic tie-breaker: rider_id ascending
+            if cost < best_cost or (best_slot >= 0 and abs(cost - best_cost) < 1e-4 and rider.rider_id < env.riders[best_slot].rider_id):
+                best_cost = cost
+                best_slot = slot
+
+        return best_slot if best_slot >= 0 else defer_action
+
+
 def evaluate_policy_on_scenarios(
     policy: BaselinePolicy,
     scenario_seeds: List[int],

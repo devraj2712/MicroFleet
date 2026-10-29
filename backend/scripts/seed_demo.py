@@ -1,6 +1,8 @@
 import sys
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Optional
+from sqlalchemy.orm import Session
 
 # Ensure backend root is on sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -20,11 +22,16 @@ from backend.app.models.entities import (
 )
 
 
-def seed_demo_data():
+def seed_demo_data(session: Optional[Session] = None) -> dict:
     """Seed a deterministic, idempotent Mumbai logistics demo dataset."""
     print("Initializing database tables...")
     init_db()
-    db = SessionLocal()
+    should_close = False
+    if session is None:
+        db = SessionLocal()
+        should_close = True
+    else:
+        db = session
 
     try:
         now = datetime.now(timezone.utc)
@@ -117,7 +124,7 @@ def seed_demo_data():
                     setattr(existing, k, v)
                 print(f"  * Updated Rider: {r_data['display_name']} [{r_data['id']}]")
 
-        # 3. Seed Orders (4 Simulated Mumbai Deliveries)
+        # 3. Seed Orders (Simulated Mumbai Deliveries across 3 Merchants)
         orders_data = [
             {
                 "id": "ORD-MUM-01",
@@ -126,7 +133,7 @@ def seed_demo_data():
                 "pickup_longitude": 72.8295,
                 "delivery_latitude": 19.0680,
                 "delivery_longitude": 72.8385,
-                "delivery_deadline": now + timedelta(hours=2),
+                "delivery_deadline": now + timedelta(hours=2, minutes=30),
                 "package_type": "PERISHABLE",
                 "handling_requirements": "Keep upright, temperature sensitive (SIMULATED)",
                 "weight_kg": 2.5,
@@ -158,11 +165,11 @@ def seed_demo_data():
                 "pickup_longitude": 72.8478,
                 "delivery_latitude": 19.0120,
                 "delivery_longitude": 72.8310,
-                "delivery_deadline": now + timedelta(hours=1, minutes=30),
+                "delivery_deadline": now + timedelta(hours=2),
                 "package_type": "PERISHABLE",
                 "handling_requirements": "Organic vegetables box (SIMULATED)",
-                "weight_kg": 6.0,
-                "package_count": 3,
+                "weight_kg": 4.0,
+                "package_count": 2,
                 "customer_priority": "VIP",
                 "merchant_priority": 1,
                 "status": OrderStatus.PENDING.value,
@@ -174,7 +181,7 @@ def seed_demo_data():
                 "pickup_longitude": 72.8288,
                 "delivery_latitude": 18.9810,
                 "delivery_longitude": 72.8240,
-                "delivery_deadline": now + timedelta(hours=1),
+                "delivery_deadline": now + timedelta(hours=1, minutes=45),
                 "package_type": "MEDICAL",
                 "handling_requirements": "Urgent prescription pharmaceuticals (SIMULATED)",
                 "weight_kg": 0.8,
@@ -183,9 +190,45 @@ def seed_demo_data():
                 "merchant_priority": 1,
                 "status": OrderStatus.PENDING.value,
             },
+            {
+                "id": "ORD-MUM-05",
+                "merchant_id": "M-MUM-02",
+                "pickup_latitude": 19.0178,
+                "pickup_longitude": 72.8478,
+                "delivery_latitude": 19.0220,
+                "delivery_longitude": 72.8430,
+                "delivery_deadline": now + timedelta(hours=3, minutes=15),
+                "package_type": "PARCEL",
+                "handling_requirements": "Gourmet grocery pack (SIMULATED)",
+                "weight_kg": 2.2,
+                "package_count": 1,
+                "customer_priority": "STANDARD",
+                "merchant_priority": 2,
+                "status": OrderStatus.PENDING.value,
+            },
+            {
+                "id": "ORD-MUM-DETOUR",
+                "merchant_id": "M-MUM-01",
+                "pickup_latitude": 19.0596,
+                "pickup_longitude": 72.8295,
+                "delivery_latitude": 19.1200,
+                "delivery_longitude": 72.8500,
+                "delivery_deadline": now + timedelta(minutes=5),
+                "package_type": "PARCEL",
+                "handling_requirements": "Deliberately tight deadline order for diagnostic rejection testing (SIMULATED)",
+                "weight_kg": 1.0,
+                "package_count": 1,
+                "customer_priority": "STANDARD",
+                "merchant_priority": 3,
+                "status": OrderStatus.PENDING.value,
+            },
         ]
 
         print("Seeding Orders...")
+        # Clear any stale test orders not in the deterministic demo set
+        demo_order_ids = {o["id"] for o in orders_data}
+        db.query(Order).filter(~Order.id.in_(demo_order_ids)).delete(synchronize_session=False)
+
         for o_data in orders_data:
             existing = db.get(Order, o_data["id"])
             if not existing:
@@ -194,6 +237,7 @@ def seed_demo_data():
             else:
                 for k, v in o_data.items():
                     setattr(existing, k, v)
+                print(f"  * Updated Order: [{o_data['id']}] with fresh relative deadline")
         # 4. Seed Users (Role-based development accounts)
         users_data = [
             {
@@ -263,12 +307,22 @@ def seed_demo_data():
 
         db.commit()
         print("\nDemo data seeding completed successfully! [All records marked as SIMULATED]")
+        return {
+            "status": "ok",
+            "message": "Demo data reset successfully with fresh relative deadlines.",
+            "merchants_count": len(merchants_data),
+            "riders_count": len(riders_data),
+            "orders_count": len(orders_data),
+            "users_count": len(users_data),
+            "reference_time": now.isoformat(),
+        }
     except Exception as e:
         db.rollback()
         print(f"Error seeding demo data: {e}", file=sys.stderr)
         raise
     finally:
-        db.close()
+        if should_close:
+            db.close()
 
 
 if __name__ == "__main__":

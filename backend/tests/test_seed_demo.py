@@ -8,13 +8,15 @@ def test_seed_demo_execution():
 
     db = SessionLocal()
     try:
-        merchants = db.query(Merchant).all()
-        assert len(merchants) >= 3
+        demo_merchant_ids = ["M-MUM-01", "M-MUM-02", "M-MUM-03"]
+        merchants = db.query(Merchant).filter(Merchant.id.in_(demo_merchant_ids)).all()
+        assert len(merchants) == 3
         for m in merchants:
             assert "SIMULATED" in m.name
 
-        riders = db.query(Rider).all()
-        assert len(riders) >= 3
+        demo_rider_ids = ["R-MUM-01", "R-MUM-02", "R-MUM-03"]
+        riders = db.query(Rider).filter(Rider.id.in_(demo_rider_ids)).all()
+        assert len(riders) == 3
         for r in riders:
             assert "SIMULATED" in r.display_name
 

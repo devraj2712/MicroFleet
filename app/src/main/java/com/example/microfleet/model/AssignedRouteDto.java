@@ -28,6 +28,9 @@ public class AssignedRouteDto {
     @SerializedName("orders")
     private List<OrderDto> orders;
 
+    @SerializedName("route_coordinates")
+    private List<List<Double>> routeCoordinates;
+
     public String getBatchId() { return batchId; }
     public String getStatus() { return status; }
     public String getBatchStatus() { return status; }
@@ -37,4 +40,5 @@ public class AssignedRouteDto {
     public double getTotalDurationMinutes() { return totalDurationMinutes; }
     public List<RouteStopDto> getStops() { return stops; }
     public List<OrderDto> getOrders() { return orders; }
+    public List<List<Double>> getRouteCoordinates() { return routeCoordinates; }
 }

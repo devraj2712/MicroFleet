@@ -11,6 +11,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.microfleet.map.MapHelper;
 import com.example.microfleet.model.AssignedRouteDto;
 import com.example.microfleet.model.OrderDto;
 import com.example.microfleet.model.RouteStopDto;
@@ -21,6 +22,10 @@ import com.example.microfleet.network.ApiService;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,12 +46,14 @@ public class RiderActivity extends AppCompatActivity {
     private TextView mTextRiderStatusMessage;
     private TextView mTextRiderEmpty;
     private LinearLayout mContainerRiderRoutes;
+    private MapView mMapView;
 
     private String mRiderId = "R-MUM-01"; // Default demo fallback
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        MapHelper.initOsmdroid(this);
         setContentView(R.layout.activity_rider);
 
         mTextRiderTitle = findViewById(R.id.text_rider_title);
@@ -59,6 +66,11 @@ public class RiderActivity extends AppCompatActivity {
         mTextRiderStatusMessage = findViewById(R.id.text_rider_status_message);
         mTextRiderEmpty = findViewById(R.id.text_rider_empty);
         mContainerRiderRoutes = findViewById(R.id.container_rider_routes);
+        mMapView = findViewById(R.id.map_rider);
+
+        if (mMapView != null) {
+            MapHelper.configureMapView(mMapView, getRiderStartLocation(mRiderId), 12.0);
+        }
 
         UserDto user = ApiClient.getCurrentUser();
         if (user != null) {
@@ -79,6 +91,15 @@ public class RiderActivity extends AppCompatActivity {
         mButtonRefreshRiderRoutes.setOnClickListener(v -> loadAssignedRoutes());
 
         loadAssignedRoutes();
+    }
+
+    private GeoPoint getRiderStartLocation(String riderId) {
+        if ("R-MUM-02".equalsIgnoreCase(riderId)) {
+            return new GeoPoint(19.1136, 72.8697); // Andheri East
+        } else if ("R-MUM-03".equalsIgnoreCase(riderId)) {
+            return new GeoPoint(18.9950, 72.8300); // Lower Parel
+        }
+        return new GeoPoint(19.0550, 72.8350); // Bandra West (R-MUM-01)
     }
 
     private void showLoading(boolean loading) {
@@ -142,6 +163,51 @@ public class RiderActivity extends AppCompatActivity {
         }
 
         mTextDeliveriesProgress.setText(completedDeliveries + " / " + totalDeliveries);
+
+        // Map Rendering of assigned route and stops
+        if (mMapView != null) {
+            mMapView.getOverlays().clear();
+            GeoPoint riderOrigin = getRiderStartLocation(mRiderId);
+            MapHelper.addMarker(mMapView, riderOrigin.getLatitude(), riderOrigin.getLongitude(),
+                    "Rider Start (" + mRiderId + ")", "Configured Demo Location");
+
+            List<GeoPoint> points = new ArrayList<>();
+            points.add(riderOrigin);
+
+            for (AssignedRouteDto route : routes) {
+                if (route.getRouteCoordinates() != null && !route.getRouteCoordinates().isEmpty()) {
+                    MapHelper.drawRoutePolyline(mMapView, route.getRouteCoordinates(), Color.parseColor("#2563EB"), 8f);
+                }
+                if (route.getStops() != null) {
+                    int idx = 1;
+                    for (RouteStopDto stop : route.getStops()) {
+                        GeoPoint p = new GeoPoint(stop.getLatitude(), stop.getLongitude());
+                        points.add(p);
+                        MapHelper.addMarker(mMapView, stop.getLatitude(), stop.getLongitude(),
+                                "Stop " + idx++ + " [" + stop.getStopType() + "]",
+                                "Order: " + stop.getOrderId() + " | ETA: " + stop.getExpectedArrivalMinutes() + " mins");
+                    }
+                }
+            }
+
+            MapHelper.zoomToPoints(mMapView, points);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mMapView != null) {
+            mMapView.onResume();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mMapView != null) {
+            mMapView.onPause();
+        }
     }
 
     private View createRouteCardView(AssignedRouteDto route) {

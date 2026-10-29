@@ -11,9 +11,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.microfleet.map.MapHelper;
 import com.example.microfleet.model.OrderDto;
 import com.example.microfleet.network.ApiClient;
+import com.google.android.material.card.MaterialCardView;
 
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import retrofit2.Call;
@@ -30,12 +36,15 @@ public class OrderListActivity extends AppCompatActivity {
     private Button mBtnRetryOrders;
     private LinearLayout mContainerEmpty;
     private RecyclerView mRecyclerOrders;
+    private MaterialCardView mCardOrdersMap;
+    private MapView mMapView;
 
     private OrderAdapter mAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        MapHelper.initOsmdroid(this);
         setContentView(R.layout.activity_order_list);
 
         if (getSupportActionBar() != null) {
@@ -51,6 +60,12 @@ public class OrderListActivity extends AppCompatActivity {
         mBtnRetryOrders = findViewById(R.id.btn_retry_orders);
         mContainerEmpty = findViewById(R.id.container_empty);
         mRecyclerOrders = findViewById(R.id.recycler_orders);
+        mCardOrdersMap = findViewById(R.id.card_orders_map);
+        mMapView = findViewById(R.id.map_orders_list);
+
+        if (mMapView != null) {
+            MapHelper.configureMapView(mMapView, MapHelper.MUMBAI_CENTER, 11.5);
+        }
 
         mAdapter = new OrderAdapter();
         mRecyclerOrders.setLayoutManager(new LinearLayoutManager(this));
@@ -73,6 +88,9 @@ public class OrderListActivity extends AppCompatActivity {
         mContainerError.setVisibility(View.GONE);
         mContainerEmpty.setVisibility(View.GONE);
         mRecyclerOrders.setVisibility(View.GONE);
+        if (mCardOrdersMap != null) {
+            mCardOrdersMap.setVisibility(View.GONE);
+        }
 
         ApiClient.getApiService().getOrders(null).enqueue(new Callback<List<OrderDto>>() {
             @Override
@@ -88,6 +106,27 @@ public class OrderListActivity extends AppCompatActivity {
                     } else {
                         mRecyclerOrders.setVisibility(View.VISIBLE);
                         mAdapter.setOrders(orders);
+
+                        if (mCardOrdersMap != null && mMapView != null) {
+                            mCardOrdersMap.setVisibility(View.VISIBLE);
+                            mMapView.getOverlays().clear();
+                            List<GeoPoint> points = new ArrayList<>();
+
+                            for (OrderDto o : orders) {
+                                GeoPoint pick = new GeoPoint(o.getPickupLatitude(), o.getPickupLongitude());
+                                GeoPoint del = new GeoPoint(o.getDeliveryLatitude(), o.getDeliveryLongitude());
+                                points.add(pick);
+                                points.add(del);
+
+                                MapHelper.addMarker(mMapView, o.getPickupLatitude(), o.getPickupLongitude(),
+                                        "Pickup: " + o.getId(), "Merchant: " + o.getMerchantId());
+                                MapHelper.addMarker(mMapView, o.getDeliveryLatitude(), o.getDeliveryLongitude(),
+                                        "Delivery: " + o.getId() + " [" + o.getStatus() + "]",
+                                        o.getPackageType() + " (" + o.getWeightKg() + "kg)");
+                            }
+
+                            MapHelper.zoomToPoints(mMapView, points);
+                        }
                     }
                 } else {
                     showErrorState("Server error: HTTP " + response.code());
@@ -98,9 +137,25 @@ public class OrderListActivity extends AppCompatActivity {
             public void onFailure(Call<List<OrderDto>> call, Throwable t) {
                 mProgressOrders.setVisibility(View.GONE);
                 showErrorState("Cannot load orders: " + t.getLocalizedMessage() +
-                        "\nBackend at " + ApiClient.getBaseUrl() + " is unreachable.");
+                        "\nEnsure server is running.");
             }
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mMapView != null) {
+            mMapView.onResume();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mMapView != null) {
+            mMapView.onPause();
+        }
     }
 
     private void showErrorState(String message) {

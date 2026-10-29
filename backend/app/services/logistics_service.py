@@ -248,6 +248,23 @@ class LogisticsService:
                         resp.assigned_rider_name = r.rider.display_name if r.rider else "Unknown Rider"
                         orders_list.append(resp)
 
+            # Generate road-network polyline coordinates for rider view
+            from backend.app.intelligence.osm.osm_service import OSMService
+            route_coords = []
+            if stops and len(stops) >= 2:
+                for i in range(len(stops) - 1):
+                    lat1 = stops[i].get("latitude")
+                    lon1 = stops[i].get("longitude")
+                    lat2 = stops[i+1].get("latitude")
+                    lon2 = stops[i+1].get("longitude")
+                    if lat1 is not None and lon1 is not None and lat2 is not None and lon2 is not None:
+                        leg = OSMService.estimate_route(lat1, lon1, lat2, lon2)
+                        if leg and leg.route_coordinates:
+                            if route_coords and route_coords[-1] == leg.route_coordinates[0]:
+                                route_coords.extend(leg.route_coordinates[1:])
+                            else:
+                                route_coords.extend(leg.route_coordinates)
+
             results.append({
                 "route_id": r.id,
                 "batch_id": r.batch_id,
@@ -258,6 +275,7 @@ class LogisticsService:
                 "estimated_duration_minutes": round(r.estimated_duration_s / 60.0, 1),
                 "ordered_stops": stops,
                 "orders": orders_list,
+                "route_coordinates": route_coords,
                 "created_at": r.created_at,
             })
 

@@ -83,6 +83,12 @@ class RiderRouteOption(BaseModel):
     is_feasible: bool
     infeasibility_reasons: List[str] = Field(default_factory=list)
     aco_execution_time_ms: float
+    approach_distance_km: float = 0.0
+    approach_duration_minutes: float = 0.0
+    route_coordinates: List[List[float]] = Field(
+        default_factory=list,
+        description="Continuous road network lat/lon pairs for polyline rendering",
+    )
     baseline_comparison: Dict[str, Any] = Field(
         default_factory=dict,
         description="Side-by-side metrics against the deterministic greedy routing baseline",
@@ -96,6 +102,10 @@ class BatchRouteResult(BaseModel):
     eligible_rider_ids: List[str]
     route_candidates: List[RiderRouteOption]
     best_feasible_candidate: Optional[RiderRouteOption] = None
+    route_coordinates: List[List[float]] = Field(
+        default_factory=list,
+        description="Continuous road network lat/lon pairs for the best feasible candidate",
+    )
     is_routeable: bool
     unrouteable_reason: Optional[str] = None
 
@@ -113,6 +123,7 @@ def validate_route(
     stops: List[RouteStop],
     orders: List[Any],
     rider: Any,
+    reference_time: Optional[datetime] = None,
 ) -> Tuple[bool, List[str]]:
     """Independent validator checking precedence, capacity throughout route, and delivery deadlines."""
     reasons: List[str] = []
@@ -162,12 +173,12 @@ def validate_route(
         if s.onboard_weight_kg > r_w_cap + 1e-4:
             reasons.append(
                 f"Weight capacity exceeded at stop {s.stop_index} ({s.event_type} {s.order_id}): "
-                f"onboard={s.onboard_weight_kg:.2f}kg > capacity={r_w_cap:.2f}kg."
+                f"onboard load {s.onboard_weight_kg:.2f}kg exceeds vehicle limit of {r_w_cap:.2f}kg."
             )
         if s.onboard_packages > r_p_cap:
             reasons.append(
                 f"Package count capacity exceeded at stop {s.stop_index}: "
-                f"onboard={s.onboard_packages} > capacity={r_p_cap}."
+                f"onboard load {s.onboard_packages} pkgs exceeds vehicle limit of {r_p_cap} pkgs."
             )
 
     # Final stop must have 0 onboard load
@@ -180,10 +191,35 @@ def validate_route(
     # 4. Delivery deadline verification
     for s in stops:
         if s.event_type == "DELIVERY" and s.deadline is not None:
-            if s.arrival_time > s.deadline:
+            dl = s.deadline
+            arr = s.arrival_time
+            if dl.tzinfo is None and arr.tzinfo is not None:
+                dl = dl.replace(tzinfo=timezone.utc)
+            elif dl.tzinfo is not None and arr.tzinfo is None:
+                arr = arr.replace(tzinfo=timezone.utc)
+
+            if arr > dl:
+                overrun_sec = (arr - dl).total_seconds()
+                dl_str = dl.strftime("%Y-%m-%d %H:%M")
+                arr_str = arr.strftime("%H:%M")
+                if reference_time is not None:
+                    ref = reference_time
+                    if ref.tzinfo is None and dl.tzinfo is not None:
+                        ref = ref.replace(tzinfo=timezone.utc)
+                    elif ref.tzinfo is not None and dl.tzinfo is None:
+                        dl = dl.replace(tzinfo=timezone.utc)
+                    if ref > dl:
+                        expired_sec = (ref - dl).total_seconds()
+                        reasons.append(
+                            f"Deadline violation: deadline expired prior to dispatch at stop {s.stop_index} (order {s.order_id}): "
+                            f"deadline was {dl_str} (expired {expired_sec / 60.0:.1f} mins before dispatch). "
+                            f"Use 'Reset Demo Data' to generate fresh relative deadlines."
+                        )
+                        continue
+
                 reasons.append(
-                    f"Deadline violation at stop {s.stop_index} (order {s.order_id}): "
-                    f"arrival={s.arrival_time.isoformat()} > deadline={s.deadline.isoformat()}."
+                    f"Deadline violation: delivery deadline missed at stop {s.stop_index} (order {s.order_id}): "
+                    f"estimated arrival={arr_str} is {overrun_sec / 60.0:.1f} mins after deadline={dl_str}."
                 )
 
     return (len(reasons) == 0), reasons
@@ -414,7 +450,7 @@ def run_greedy_baseline_route(
         curr_ev = best_cand
 
     stops, dist_m, dur_s, _, _ = evaluate_route_stops(ordered, cost_matrix, reference_time)
-    is_valid, reasons = validate_route(stops, orders, rider)
+    is_valid, reasons = validate_route(stops, orders, rider, reference_time=reference_time)
     return stops, dist_m, dur_s, is_valid, reasons
 
 
@@ -562,7 +598,7 @@ class ACORoutingEngine:
                 stops, dist_m, dur_s, peak_w, peak_p = evaluate_route_stops(
                     ant_events, cost_matrix, reference_time
                 )
-                is_valid, reasons = validate_route(stops, batch_orders, rider)
+                is_valid, reasons = validate_route(stops, batch_orders, rider, reference_time=reference_time)
 
                 # Objective cost: Duration (min) + 0.5 * Distance (km) + Penalty for late stops
                 lateness_min = sum(
@@ -642,6 +678,33 @@ class ACORoutingEngine:
         w_cap = float(getattr(rider, "weight_capacity_kg", 20.0))
         p_cap = int(getattr(rider, "package_count_capacity", 10))
 
+        approach_dist_m = 0.0
+        approach_dur_s = 0.0
+        if len(final_stops) > 1:
+            pair = (final_stops[0].event_id, final_stops[1].event_id)
+            approach_dist_m, approach_dur_s = cost_matrix.get(pair, (0.0, 0.0))
+
+        # Generate continuous road network coordinates
+        route_coords: List[List[float]] = []
+        try:
+            from backend.app.intelligence.osm.osm_service import OSMService
+            for s1, s2 in zip(final_stops[:-1], final_stops[1:]):
+                try:
+                    seg = OSMService.estimate_route(s1.latitude, s1.longitude, s2.latitude, s2.longitude)
+                    if seg and seg.route_coordinates:
+                        if not route_coords:
+                            route_coords.extend(seg.route_coordinates)
+                        else:
+                            route_coords.extend(seg.route_coordinates[1:])
+                    else:
+                        route_coords.append([s1.latitude, s1.longitude])
+                        route_coords.append([s2.latitude, s2.longitude])
+                except Exception:
+                    route_coords.append([s1.latitude, s1.longitude])
+                    route_coords.append([s2.latitude, s2.longitude])
+        except Exception:
+            route_coords = [[s.latitude, s.longitude] for s in final_stops]
+
         return RiderRouteOption(
             rider_id=rider.id,
             rider_display_name=getattr(rider, "display_name", rider.id),
@@ -650,6 +713,9 @@ class ACORoutingEngine:
             distance_km=round(final_dist_m / 1000.0, 2),
             duration_seconds=round(final_dur_s, 1),
             duration_minutes=round(final_dur_s / 60.0, 1),
+            approach_distance_km=round(approach_dist_m / 1000.0, 2),
+            approach_duration_minutes=round(approach_dur_s / 60.0, 1),
+            route_coordinates=route_coords,
             peak_weight_kg=round(final_peak_w, 2),
             peak_packages=final_peak_p,
             peak_weight_utilization_pct=round((final_peak_w / w_cap) * 100.0, 1) if w_cap > 0 else 0.0,
@@ -747,7 +813,36 @@ class ACORoutingEngine:
             else:
                 best_opt = min(rider_options, key=lambda o: (o.duration_seconds, o.distance_meters)) if rider_options else None
                 is_routeable = False
-                unrouteable_reason = "No candidate route met all delivery deadlines and capacity limits."
+
+                # Synthesize informative diagnostic explanation across all evaluated candidates
+                expired_reasons = []
+                missed_reasons = []
+                capacity_reasons = []
+                for opt in rider_options:
+                    for r_msg in opt.infeasibility_reasons:
+                        if "expired prior to dispatch" in r_msg:
+                            expired_reasons.append(f"{opt.rider_display_name}: {r_msg}")
+                        elif "missed" in r_msg or "Deadline violation" in r_msg:
+                            missed_reasons.append(f"{opt.rider_display_name}: {r_msg}")
+                        elif "capacity" in r_msg.lower():
+                            capacity_reasons.append(f"{opt.rider_display_name}: {r_msg}")
+
+                if expired_reasons:
+                    unrouteable_reason = (
+                        f"All candidate riders failed deadlines: order deadlines expired prior to dispatch evaluation. "
+                        f"Use 'Reset Demo Data' to generate fresh relative deadlines."
+                    )
+                elif missed_reasons:
+                    unrouteable_reason = (
+                        f"All candidate riders missed delivery deadlines: road travel times exceed deadline slack. "
+                        f"({missed_reasons[0]})"
+                    )
+                elif capacity_reasons:
+                    unrouteable_reason = (
+                        f"Vehicle capacity limit exceeded: {capacity_reasons[0]}"
+                    )
+                else:
+                    unrouteable_reason = "No candidate route met all delivery deadlines and operational constraints."
 
             batch_route_results.append(
                 BatchRouteResult(
@@ -756,6 +851,7 @@ class ACORoutingEngine:
                     eligible_rider_ids=[r.id for r in eligible_candidates],
                     route_candidates=rider_options,
                     best_feasible_candidate=best_opt if is_routeable else None,
+                    route_coordinates=best_opt.route_coordinates if (best_opt and is_routeable) else [],
                     is_routeable=is_routeable,
                     unrouteable_reason=unrouteable_reason,
                 )

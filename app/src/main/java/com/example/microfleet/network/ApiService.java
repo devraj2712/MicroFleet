@@ -69,4 +69,8 @@ public interface ApiService {
 
     @PATCH("api/v1/orders/{id}/status")
     Call<OrderDto> updateOrderStatus(@Path("id") String orderId, @Body UpdateOrderStatusRequest request);
+
+    // Development & Demo Reset
+    @POST("api/v1/demo/reset")
+    Call<Map<String, Object>> resetDemoData();
 }

@@ -150,16 +150,33 @@
             android:textSize="12sp"
             android:visibility="gone" />
 
+        <!-- Map View for Rider Route -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_rider_map"
+            android:layout_width="match_parent"
+            android:layout_height="240dp"
+            android:layout_marginTop="12dp"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="3dp"
+            app:strokeColor="#CBD5E1"
+            app:strokeWidth="1dp">
+
+            <org.osmdroid.views.MapView
+                android:id="@+id/map_rider"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Empty state -->
         <TextView
             android:id="@+id/text_rider_empty"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="16dp"
             android:gravity="center"
-            android:text="No active delivery routes assigned to you.\nCheck back when dispatcher commits a plan."
+            android:text="No active delivery routes assigned to you.\nStatus: Available / Ready for dispatch"
             android:textColor="@color/text_secondary"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:visibility="gone" />
 
         <!-- Routes Container -->

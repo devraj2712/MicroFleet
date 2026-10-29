@@ -41,6 +41,24 @@ public class BatchRouteItemDto {
     @SerializedName("reason")
     private String reason;
 
+    @SerializedName("explanation")
+    private String explanation;
+
+    @SerializedName("approach_distance_km")
+    private double approachDistanceKm;
+
+    @SerializedName("approach_duration_minutes")
+    private double approachDurationMinutes;
+
+    @SerializedName("fleet_cost")
+    private double fleetCost;
+
+    @SerializedName("route_coordinates")
+    private List<List<Double>> routeCoordinates;
+
+    @SerializedName("evaluated_alternatives")
+    private List<Map<String, Object>> evaluatedAlternatives;
+
     public String getBatchId() { return batchId; }
     public String getAssignedRiderId() { return assignedRiderId; }
     public String getAssignedRiderName() { return assignedRiderName; }
@@ -53,4 +71,10 @@ public class BatchRouteItemDto {
     public List<RouteStopDto> getStops() { return stops; }
     public Map<String, Double> getUrgencyScores() { return urgencyScores; }
     public String getReason() { return reason; }
+    public String getExplanation() { return explanation; }
+    public double getApproachDistanceKm() { return approachDistanceKm; }
+    public double getApproachDurationMinutes() { return approachDurationMinutes; }
+    public double getFleetCost() { return fleetCost; }
+    public List<List<Double>> getRouteCoordinates() { return routeCoordinates; }
+    public List<Map<String, Object>> getEvaluatedAlternatives() { return evaluatedAlternatives; }
 }
