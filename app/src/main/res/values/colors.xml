@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="primary">#8B5CF6</color>
+    <color name="primary_dark">#6D28D9</color>
+    <color name="accent">#B79BFF</color>
+    <color name="background_light">#08080B</color>
+    <color name="background">#08080B</color>
+    <color name="card_background">#171521</color>
+    <color name="card_background_alt">#1D1929</color>
+    <color name="card_edge">#3A3449</color>
+    <color name="text_primary">#F1EFFA</color>
+    <color name="text_secondary">#BDB9D3</color>
+    <color name="text_muted">#8E8AA6</color>
+    <color name="status_pending">#FBBF24</color>
+    <color name="status_batched">#818CF8</color>
+    <color name="status_dispatched">#B79BFF</color>
+    <color name="status_delivered">#6EE7A8</color>
+    <color name="status_cancelled">#FB7185</color>
+    <color name="success">#6EE7A8</color>
+    <color name="error">#FB7185</color>
+</resources>

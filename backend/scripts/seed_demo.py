@@ -1,5 +1,6 @@
 import sys
 import os
+import random
 from datetime import datetime, timedelta, timezone
 
 # Ensure backend root is on sys.path
@@ -28,6 +29,22 @@ def seed_demo_data():
 
     try:
         now = datetime.now(timezone.utc)
+
+        # Keep demo riders inside the simulated Mumbai service area, while giving
+        # each reset fresh starting positions close to the active merchant clusters.
+        rng = random.SystemRandom()
+        rider_start_zones = [
+            (19.0596, 72.8295),  # Bandra
+            (19.0178, 72.8478),  # Dadar
+            (18.9953, 72.8288),  # Lower Parel
+            (19.0460, 72.8290),
+            (19.0320, 72.8460),
+        ]
+        rider_locations = [
+            (round(lat + rng.uniform(-0.0025, 0.0025), 6),
+             round(lon + rng.uniform(-0.0025, 0.0025), 6))
+            for lat, lon in rider_start_zones
+        ]
 
         # Clear existing operational routes, batches, and drafts for clean demo state
         db.query(BatchOrder).delete()
@@ -75,13 +92,13 @@ def seed_demo_data():
                     setattr(existing, k, v)
                 print(f"  * Updated Merchant: {m_data['name']} [{m_data['id']}]")
 
-        # 2. Seed Riders (3 Fleet Delivery Riders)
+        # 2. Seed Riders (5 Fleet Delivery Riders)
         riders_data = [
             {
                 "id": "R-MUM-01",
                 "display_name": "Aarav Sharma (SIMULATED)",
-                "current_latitude": 19.0550,
-                "current_longitude": 72.8350,
+                "current_latitude": rider_locations[0][0],
+                "current_longitude": rider_locations[0][1],
                 "weight_capacity_kg": 25.0,
                 "package_count_capacity": 12,
                 "is_available": True,
@@ -89,8 +106,8 @@ def seed_demo_data():
             {
                 "id": "R-MUM-02",
                 "display_name": "Rohan Patel (SIMULATED)",
-                "current_latitude": 19.0200,
-                "current_longitude": 72.8420,
+                "current_latitude": rider_locations[1][0],
+                "current_longitude": rider_locations[1][1],
                 "weight_capacity_kg": 20.0,
                 "package_count_capacity": 8,
                 "is_available": True,
@@ -98,10 +115,28 @@ def seed_demo_data():
             {
                 "id": "R-MUM-03",
                 "display_name": "Vikram Jadhav (SIMULATED)",
-                "current_latitude": 18.9900,
-                "current_longitude": 72.8300,
+                "current_latitude": rider_locations[2][0],
+                "current_longitude": rider_locations[2][1],
                 "weight_capacity_kg": 30.0,
                 "package_count_capacity": 15,
+                "is_available": True,
+            },
+            {
+                "id": "R-MUM-04",
+                "display_name": "Priya Mehta (SIMULATED)",
+                "current_latitude": rider_locations[3][0],
+                "current_longitude": rider_locations[3][1],
+                "weight_capacity_kg": 22.0,
+                "package_count_capacity": 10,
+                "is_available": True,
+            },
+            {
+                "id": "R-MUM-05",
+                "display_name": "Imran Shaikh (SIMULATED)",
+                "current_latitude": rider_locations[4][0],
+                "current_longitude": rider_locations[4][1],
+                "weight_capacity_kg": 24.0,
+                "package_count_capacity": 11,
                 "is_available": True,
             },
         ]
@@ -226,6 +261,22 @@ def seed_demo_data():
                 "role": UserRole.RIDER.value,
                 "merchant_id": None,
                 "rider_id": "R-MUM-03",
+                "is_active": True,
+            },
+            {
+                "id": "USR-DEV-RIDER-4",
+                "email": "rider4@microfleet.dev",
+                "role": UserRole.RIDER.value,
+                "merchant_id": None,
+                "rider_id": "R-MUM-04",
+                "is_active": True,
+            },
+            {
+                "id": "USR-DEV-RIDER-5",
+                "email": "rider5@microfleet.dev",
+                "role": UserRole.RIDER.value,
+                "merchant_id": None,
+                "rider_id": "R-MUM-05",
                 "is_active": True,
             },
             {

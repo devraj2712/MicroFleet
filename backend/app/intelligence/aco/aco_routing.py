@@ -32,7 +32,7 @@ class ACOConfig(BaseModel):
     q_deposit: float = Field(default=100.0, ge=1.0, le=1000.0, description="Pheromone deposit coefficient")
     random_seed: Optional[int] = Field(None, description="Random seed for reproducible route exploration")
     service_time_seconds: float = Field(default=180.0, ge=0.0, le=1800.0, description="Service time allowance per stop")
-    max_candidate_riders: int = Field(default=3, ge=1, le=10, description="Upper bound on candidate riders evaluated per batch")
+    max_candidate_riders: int = Field(default=5, ge=1, le=10, description="Upper bound on candidate riders evaluated per batch")
 
 
 class RouteEvent(BaseModel):
@@ -720,7 +720,20 @@ class ACORoutingEngine:
                 )
                 continue
 
-            # Limit candidate riders evaluated per batch to max_candidate_riders
+            # Evaluate the nearest riders first so a candidate cap cannot exclude
+            # the rider who is closest to this batch's pickup locations.
+            pickup_ids = [f"P_{order.id}" for order in b_orders]
+
+            def approach_key(rider: Any) -> Tuple[float, float, str]:
+                rider_id = f"R_{rider.id}"
+                approaches = [
+                    cost_matrix.get((rider_id, pickup_id), (float("inf"), float("inf")))
+                    for pickup_id in pickup_ids
+                ]
+                distance_m, duration_s = min(approaches, key=lambda pair: (pair[1], pair[0]))
+                return duration_s, distance_m, str(rider.id)
+
+            eligible_candidates.sort(key=approach_key)
             eval_candidates = eligible_candidates[: cfg.max_candidate_riders]
             rider_options: List[RiderRouteOption] = []
 

@@ -263,7 +263,7 @@ class ACOConfigInput(BaseModel):
     q_deposit: Optional[float] = Field(default=100.0, ge=1.0, le=1000.0, description="Pheromone deposit coefficient")
     random_seed: Optional[int] = Field(None, description="Random seed for reproducible route exploration")
     service_time_seconds: Optional[float] = Field(default=180.0, ge=0.0, le=1800.0, description="Service time allowance per stop")
-    max_candidate_riders: Optional[int] = Field(default=3, ge=1, le=10, description="Upper bound on candidate riders evaluated per batch")
+    max_candidate_riders: Optional[int] = Field(default=5, ge=1, le=10, description="Upper bound on candidate riders evaluated per batch")
 
 
 class RouteOptimizationPreviewRequest(BaseModel):

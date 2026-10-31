@@ -29,13 +29,13 @@
     "total_unassigned": 6,
     "percentage_batches_assigned": 94.0,
     "percentage_on_time": 100.0,
-    "total_distance_km": 868.67,
-    "total_duration_min": 3503.2,
+    "total_distance_km": 857.81,
+    "total_duration_min": 3473.5,
     "hard_constraint_violations": 0,
-    "average_episode_reward": 52.34,
-    "reward_std_dev": 6.44,
-    "total_inference_time_ms": 68.96,
-    "avg_inference_time_per_decision_ms": 0.69
+    "average_episode_reward": 52.44,
+    "reward_std_dev": 6.51,
+    "total_inference_time_ms": 45.25,
+    "avg_inference_time_per_decision_ms": 0.453
   },
   "baselines": {
     "nearest_feasible_rider": {
